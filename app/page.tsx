@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { getPatientFolders, uploadFileToPatientFolder } from "@/lib/webdav"
 import {
   Heart,
   LayoutDashboard,
@@ -171,12 +172,33 @@ export default function HealthFileDashboard() {
     medicalHistory: "",
   })
 
-  const filteredFiles = files.filter(
-    (file) =>
-      (file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        file.patient.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      (fileManagerFilter === "all" || !fileManagerFilter || file.patient === fileManagerFilter),
-  )
+  useEffect(() => {
+    const loadPatients = async () => {
+      try {
+        const folders = await getPatientFolders()
+        if (folders.length > 0) {
+          const mapped = folders.map((name, idx) => ({
+            id: String(idx + 1),
+            fullName: name,
+            email: "",
+            phone: "",
+            dob: "",
+            gender: "",
+            address: "",
+            bloodType: "",
+            allergies: "",
+            medicalHistory: "",
+            fileCount: 0,
+          }))
+          setPatients(mapped)
+        }
+      } catch (err) {
+        console.error("Failed to load patients from Nextcloud", err)
+        // Keep initial patients
+      }
+    }
+    loadPatients()
+  }, [])
 
   const patientNames = patients.map((p) => p.fullName)
   const totalFiles = files.length
@@ -184,23 +206,33 @@ export default function HealthFileDashboard() {
   const recentFiles = files.slice().reverse().slice(0, 3)
 
   const handleFileUpload = () => {
-    if (!uploadedFile || !selectedPatientForUpload) {
-      return
+    if (!uploadedFile || !selectedPatientForUpload) return
+
+    // Upload the file to Nextcloud
+    const doUpload = async () => {
+      try {
+        await uploadFileToPatientFolder(selectedPatientForUpload, uploadedFile)
+
+        const newFile = {
+          id: Math.max(...files.map((f) => f.id), 0) + 1,
+          name: uploadedFile.name,
+          patient: selectedPatientForUpload,
+          type: uploadedFile.name.split(".").pop()?.toUpperCase() || "FILE",
+          dateAdded: new Date().toISOString().split("T")[0],
+        }
+
+        setFiles((prev) => [...prev, newFile])
+        setUploadedFile(null)
+        setSelectedPatientForUpload(null)
+        setUploadSuccess(true)
+        setTimeout(() => setUploadSuccess(false), 3000)
+      } catch (err: any) {
+        console.error("Upload failed", err)
+        alert(`Upload failed: ${err?.message || String(err)}`)
+      }
     }
 
-    const newFile = {
-      id: Math.max(...files.map((f) => f.id), 0) + 1,
-      name: uploadedFile.name,
-      patient: selectedPatientForUpload,
-      type: uploadedFile.name.split(".").pop()?.toUpperCase() || "FILE",
-      dateAdded: new Date().toISOString().split("T")[0],
-    }
-
-    setFiles([...files, newFile])
-    setUploadedFile(null)
-    setSelectedPatientForUpload(null)
-    setUploadSuccess(true)
-    setTimeout(() => setUploadSuccess(false), 3000)
+    void doUpload()
   }
 
   const handleDeleteFile = (fileId: number) => {
