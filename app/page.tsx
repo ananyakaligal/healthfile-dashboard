@@ -177,19 +177,22 @@ export default function HealthFileDashboard() {
       try {
         const folders = await getPatientFolders()
         if (folders.length > 0) {
-          const mapped = folders.map((name, idx) => ({
-            id: String(idx + 1),
-            fullName: name,
-            email: "",
-            phone: "",
-            dob: "",
-            gender: "",
-            address: "",
-            bloodType: "",
-            allergies: "",
-            medicalHistory: "",
-            fileCount: 0,
-          }))
+          const mapped = folders.map((name, idx) => {
+            const details = INITIAL_PATIENT_DETAILS[name] || { firstName: name.split(' ')[0] || '', lastName: name.split(' ')[1] || '', dob: '' }
+            return {
+              id: String(idx + 1),
+              fullName: name,
+              email: details.firstName ? `${details.firstName.toLowerCase()}.${details.lastName.toLowerCase()}@example.com` : '',
+              phone: '',
+              dob: details.dob,
+              gender: '',
+              address: '',
+              bloodType: '',
+              allergies: '',
+              medicalHistory: '',
+              fileCount: 0,
+            }
+          })
           setPatients(mapped)
         }
       } catch (err) {

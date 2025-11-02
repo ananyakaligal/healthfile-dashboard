@@ -27,7 +27,7 @@ services:
       NEXTCLOUD_OVERWRITEPROTOCOL: http
       NEXTCLOUD_BASE: http://localhost:8080/remote.php/dav/files/admin/
       NEXTCLOUD_USER: admin
-      NEXTCLOUD_APP_PASSWORD: aozkr-dgibq-2joHC-ArtFF-eoTF3
+      NEXTCLOUD_APP_PASSWORD: PdYXt-3di5x-Dazkb-iJJrt-DewBd
     depends_on:
       - db
     volumes:
