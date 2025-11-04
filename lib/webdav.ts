@@ -134,6 +134,63 @@ export async function uploadFileToPatientFolder(patientName: string, file: File)
   }
 }
 
+/**
+ * Create a new patient folder in Nextcloud with metadata
+ */
+export async function createPatientFolder(patientName: string, metadata?: any): Promise<void> {
+  if (!patientName) throw new Error('patientName is required');
+
+  // If running in browser, call our server-side proxy
+  if (typeof window !== 'undefined') {
+    const res = await fetch('/api/webdav/create-folder', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ folderName: patientName, metadata }),
+    })
+
+    if (!res.ok) {
+      const txt = await res.text()
+      throw new Error(`Failed to create folder: ${res.status} ${res.statusText} - ${txt}`)
+    }
+
+    return
+  }
+
+  // Server-side direct MKCOL
+  const url = ensureTrailingSlash(NEXTCLOUD_BASE) + encodeURIComponent(patientName) + '/'
+
+  const res = await fetch(url, {
+    method: 'MKCOL',
+    headers: {
+      Authorization: getAuthHeader(),
+    } as any,
+  })
+
+  if (!res.ok && res.status !== 405) { // 405 means folder already exists
+    const txt = await res.text()
+    throw new Error(`MKCOL failed: ${res.status} ${res.statusText} - ${txt}`)
+  }
+
+  // If metadata provided, store it as a JSON file
+  if (metadata) {
+    const metadataUrl = url + 'patient-info.json'
+    const metadataRes = await fetch(metadataUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: getAuthHeader(),
+        'Content-Type': 'application/json',
+      } as any,
+      body: JSON.stringify(metadata, null, 2),
+    })
+
+    if (!metadataRes.ok) {
+      console.warn('Failed to store metadata, but folder was created')
+    }
+  }
+}
+
 export function clearAppPassword() {
   appPassword = null;
 }

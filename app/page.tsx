@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getPatientFolders, uploadFileToPatientFolder } from "@/lib/webdav"
+import { getPatientFolders, uploadFileToPatientFolder, createPatientFolder } from "@/lib/webdav"
 import {
   Heart,
   LayoutDashboard,
@@ -116,12 +116,67 @@ const INITIAL_FILES = [
   { id: 3, name: "intake_form.docx", patient: "Robert Brown", type: "DOCX", dateAdded: "2023-10-25" },
 ]
 
-const INITIAL_PATIENT_DETAILS: Record<string, { firstName: string; lastName: string; dob: string }> = {
-  "John Doe": { firstName: "John", lastName: "Doe", dob: "1985-04-12" },
-  "Jane Smith": { firstName: "Jane", lastName: "Smith", dob: "1990-07-22" },
-  "Robert Brown": { firstName: "Robert", lastName: "Brown", dob: "1978-11-05" },
-  "Emily White": { firstName: "Emily", lastName: "White", dob: "1988-03-18" },
-  "Michael Johnson": { firstName: "Michael", lastName: "Johnson", dob: "1992-09-30" },
+const INITIAL_PATIENT_DETAILS: Record<string, { firstName: string; lastName: string; dob: string; email: string; phone: string; gender: string; bloodType: string; address: string; allergies: string; medicalHistory: string }> = {
+  "David Johnson": { 
+    firstName: "David", 
+    lastName: "Johnson", 
+    dob: "1975-03-12",
+    email: "david.johnson@example.com",
+    phone: "07700900345",
+    gender: "Male",
+    bloodType: "O+",
+    address: "10 Downing Street, London, SW1A 2AA",
+    allergies: "Penicillin",
+    medicalHistory: "Seasonal Asthma"
+  },
+  "Ananya Gupta": { 
+    firstName: "Ananya", 
+    lastName: "Gupta", 
+    dob: "1990-08-25",
+    email: "ananya.gupta@example.com",
+    phone: "09876543210",
+    gender: "Female",
+    bloodType: "B+",
+    address: "Flat 401, Sapphire Towers, MG Road, Mumbai",
+    allergies: "Dust",
+    medicalHistory: "Mild Migraines"
+  },
+  "Emily White": { 
+    firstName: "Emily", 
+    lastName: "White", 
+    dob: "1982-01-01",
+    email: "emily.white@example.com",
+    phone: "07890123456",
+    gender: "Female",
+    bloodType: "A-",
+    address: "The Old Rectory, Village Green, Ruralshire",
+    allergies: "Shellfish",
+    medicalHistory: "Gluten Intolerance"
+  },
+  "Rohan Mehta": { 
+    firstName: "Rohan", 
+    lastName: "Mehta", 
+    dob: "1968-04-17",
+    email: "rohan.mehta@example.com",
+    phone: "09123456789",
+    gender: "Male",
+    bloodType: "AB-",
+    address: "House No. 22, Green Avenue, Chennai",
+    allergies: "NKA (No Known Allergies)",
+    medicalHistory: "Controlled Hypertension"
+  },
+  "Sarah Davies": { 
+    firstName: "Sarah", 
+    lastName: "Davies", 
+    dob: "1995-11-29",
+    email: "sarah.davies@example.com",
+    phone: "07950517270",
+    gender: "Female",
+    bloodType: "O-",
+    address: "Apartment 5, City Centre, Manchester",
+    allergies: "Bee Stings",
+    medicalHistory: "Recurrent Ear Infections"
+  },
 }
 
 interface AdminProfile {
@@ -178,18 +233,29 @@ export default function HealthFileDashboard() {
         const folders = await getPatientFolders()
         if (folders.length > 0) {
           const mapped = folders.map((name, idx) => {
-            const details = INITIAL_PATIENT_DETAILS[name] || { firstName: name.split(' ')[0] || '', lastName: name.split(' ')[1] || '', dob: '' }
-            return {
-              id: String(idx + 1),
-              fullName: name,
-              email: details.firstName ? `${details.firstName.toLowerCase()}.${details.lastName.toLowerCase()}@example.com` : '',
+            const details = INITIAL_PATIENT_DETAILS[name] || { 
+              firstName: name.split(' ')[0] || '', 
+              lastName: name.split(' ')[1] || '', 
+              dob: '',
+              email: '',
               phone: '',
-              dob: details.dob,
               gender: '',
-              address: '',
               bloodType: '',
+              address: '',
               allergies: '',
-              medicalHistory: '',
+              medicalHistory: ''
+            }
+            return {
+              id: `patient-${Date.now()}-${idx}`, // Unique ID using timestamp
+              fullName: name,
+              email: details.email || (details.firstName ? `${details.firstName.toLowerCase()}.${details.lastName.toLowerCase()}@example.com` : ''),
+              phone: details.phone || '',
+              dob: details.dob || '',
+              gender: details.gender || '',
+              address: details.address || '',
+              bloodType: details.bloodType || '',
+              allergies: details.allergies || '',
+              medicalHistory: details.medicalHistory || '',
               fileCount: 0,
             }
           })
@@ -292,28 +358,45 @@ export default function HealthFileDashboard() {
     console.log("[v0] User logged out")
   }
 
-  const handleAddPatient = () => {
+  const handleAddPatient = async () => {
     if (!newPatientForm.fullName || !newPatientForm.email) return
 
-    const newPatient: Patient = {
-      id: String(patients.length + 1),
-      ...newPatientForm,
-      fileCount: 0,
-    }
+    try {
+      // Create folder in Nextcloud with metadata
+      await createPatientFolder(newPatientForm.fullName, {
+        email: newPatientForm.email,
+        phone: newPatientForm.phone,
+        dob: newPatientForm.dob,
+        gender: newPatientForm.gender,
+        address: newPatientForm.address,
+        bloodType: newPatientForm.bloodType,
+        allergies: newPatientForm.allergies,
+        medicalHistory: newPatientForm.medicalHistory,
+      })
 
-    setPatients([...patients, newPatient])
-    setNewPatientForm({
-      fullName: "",
-      email: "",
-      phone: "",
-      dob: "",
-      gender: "",
-      address: "",
-      bloodType: "",
-      allergies: "",
-      medicalHistory: "",
-    })
-    setShowAddPatientModal(false)
+      const newPatient: Patient = {
+        id: `patient-${Date.now()}`,
+        ...newPatientForm,
+        fileCount: 0,
+      }
+
+      setPatients([...patients, newPatient])
+      setNewPatientForm({
+        fullName: "",
+        email: "",
+        phone: "",
+        dob: "",
+        gender: "",
+        address: "",
+        bloodType: "",
+        allergies: "",
+        medicalHistory: "",
+      })
+      setShowAddPatientModal(false)
+    } catch (error: any) {
+      console.error("Failed to add patient:", error)
+      alert(`Failed to add patient: ${error?.message || String(error)}`)
+    }
   }
 
   const handleOpenPatientDetail = (patient: Patient) => {
