@@ -29,7 +29,10 @@ function ensureTrailingSlash(url: string) {
 export async function getPatientFolders(): Promise<string[]> {
   // If running in browser, call our server-side proxy
   if (typeof window !== 'undefined') {
-    const res = await fetch('/api/webdav/list')
+    const res = await fetch('/api/webdav/list', {
+      // ensure cookies are sent for authentication (same-origin)
+      credentials: 'same-origin',
+    })
     if (!res.ok) {
       const txt = await res.text()
       throw new Error(`Proxy /api/webdav/list failed: ${res.status} ${res.statusText} - ${txt}`)
@@ -104,6 +107,7 @@ export async function uploadFileToPatientFolder(patientName: string, file: File)
         'Content-Type': file.type || 'application/octet-stream',
       },
       body: arrayBuffer,
+      credentials: 'same-origin',
     })
 
     if (!res.ok) {
@@ -148,6 +152,7 @@ export async function createPatientFolder(patientName: string, metadata?: any): 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ folderName: patientName, metadata }),
+      credentials: 'same-origin',
     })
 
     if (!res.ok) {

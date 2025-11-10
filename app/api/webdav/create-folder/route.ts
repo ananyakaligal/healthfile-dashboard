@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromRequest } from '@/lib/session'
 
-const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL || 'http://localhost:8080/remote.php/dav/files/admin/'
-const USERNAME = process.env.NEXTCLOUD_USER || 'admin'
-const APP_PASSWORD = process.env.NEXTCLOUD_APP_PASSWORD || 'PdYXt-3di5x-Dazkb-iJJrt-DewBd'
+const DEFAULT_NEXTCLOUD_URL = process.env.NEXTCLOUD_URL || 'http://localhost:8080/remote.php/dav/files/'
+const ENV_USER = process.env.NEXTCLOUD_USER
+const ENV_APP_PASSWORD = process.env.NEXTCLOUD_APP_PASSWORD
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,8 +14,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'folderName is required' }, { status: 400 })
     }
 
-    const url = `${NEXTCLOUD_URL}${encodeURIComponent(folderName)}/`
-    const auth = Buffer.from(`${USERNAME}:${APP_PASSWORD}`).toString('base64')
+    // prefer session credentials, fall back to environment creds
+    const session = await getSessionFromRequest(request)
+    let username = ENV_USER
+    let password = ENV_APP_PASSWORD
+    if (session?.user) {
+      username = session.user.username
+      password = session.user.password
+    }
+
+    if (!username || !password) {
+      return NextResponse.json({ error: 'No Nextcloud credentials available' }, { status: 401 })
+    }
+
+    const baseUrl = DEFAULT_NEXTCLOUD_URL.endsWith('/') ? DEFAULT_NEXTCLOUD_URL : DEFAULT_NEXTCLOUD_URL + '/'
+    const url = `${baseUrl}${encodeURIComponent(username)}/${encodeURIComponent(folderName)}/`
+    const auth = Buffer.from(`${username}:${password}`).toString('base64')
 
     const response = await fetch(url, {
       method: 'MKCOL',
@@ -25,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // 405 means folder already exists, which is fine
     if (!response.ok && response.status !== 405) {
-      const errorText = await response.text()
+      const errorText = await response.text().catch(() => '')
       return NextResponse.json(
         { error: `Failed to create folder: ${response.status} ${errorText}` },
         { status: response.status }
@@ -34,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Store metadata as JSON file if provided
     if (metadata) {
-      const metadataUrl = `${url}patient-info.json`
+      const metadataUrl = `${baseUrl}${encodeURIComponent(username)}/${encodeURIComponent(folderName)}/patient-info.json`
       const metadataRes = await fetch(metadataUrl, {
         method: 'PUT',
         headers: {

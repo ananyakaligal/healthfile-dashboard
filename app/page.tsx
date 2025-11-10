@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { getPatientFolders, uploadFileToPatientFolder, createPatientFolder } from "@/lib/webdav"
 import {
   Heart,
@@ -209,6 +210,7 @@ export default function HealthFileDashboard() {
   const [tempProfileData, setTempProfileData] = useState(INITIAL_ADMIN_PROFILE)
   const [fileManagerFilter, setFileManagerFilter] = useState<string | null>("John Doe")
 
+  const router = useRouter()
   const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS)
   const [selectedPatientDetail, setSelectedPatientDetail] = useState<Patient | null>(null)
   const [showAddPatientModal, setShowAddPatientModal] = useState(false)
@@ -261,13 +263,19 @@ export default function HealthFileDashboard() {
           })
           setPatients(mapped)
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to load patients from Nextcloud", err)
-        // Keep initial patients
+        // Check if it's an authentication error
+        if (err?.message?.includes('401') || err?.message?.includes('Unauthorized')) {
+          // Redirect to login page
+          router.push('/login')
+          return
+        }
+        // Keep initial patients for other errors
       }
     }
     loadPatients()
-  }, [])
+  }, [router])
 
   const patientNames = patients.map((p) => p.fullName)
   const totalFiles = files.length
@@ -354,8 +362,13 @@ export default function HealthFileDashboard() {
     setTempProfileData(INITIAL_ADMIN_PROFILE)
   }
 
-  const handleLogout = () => {
-    console.log("[v0] User logged out")
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      router.push('/login')
+    } catch (err) {
+      console.error('Logout failed', err)
+    }
   }
 
   const handleAddPatient = async () => {
